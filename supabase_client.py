@@ -26,7 +26,20 @@ def _load_env() -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
+def _load_secrets() -> None:
+    """Streamlit Community Cloud has no .env — read st.secrets instead."""
+    try:
+        import streamlit as st
+
+        for key in ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"):
+            if key not in os.environ and key in st.secrets:
+                os.environ[key] = st.secrets[key]
+    except Exception:  # noqa: BLE001 — no st.secrets outside Streamlit runtime
+        pass
+
+
 _load_env()
+_load_secrets()
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
