@@ -1,0 +1,13 @@
+[project]
+name = "supabase-product-analytics"
+version = "0.1.0"
+description = "Product analytics + A/B experiments platform on Supabase (Postgres, RLS, Edge Functions) with a Streamlit dashboard."
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.36",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "plotly>=5.20",
+    "supabase>=2.4",
+    "scipy>=1.10",
+]

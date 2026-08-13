@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.streamlit/secrets.toml
+
+# Streamlit CLI symlinks into .venv (broken on clone)
+.agents/
+.claude/skills/
