@@ -33,7 +33,7 @@ for exp_id, g in df.groupby("experiment_id"):
     table = g[["variant", "assigned", "converted", "conversion"]].copy()
     table["conversion"] = (table["conversion"] * 100).round(2)
     table.columns = ["Вариант", "Назначено", "Конверсий", "Конверсия %"]
-    st.dataframe(table, use_container_width=True)
+    st.dataframe(table, width="stretch")
 
     control = g[g["variant"] == "control"]
     treatment = g[g["variant"] != "control"]
