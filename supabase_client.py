@@ -26,35 +26,46 @@ def _load_env() -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
-def _load_secrets() -> None:
-    """Streamlit Community Cloud has no .env — read st.secrets instead."""
-    try:
-        import streamlit as st
-
-        for key in ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"):
-            if key not in os.environ and key in st.secrets:
-                os.environ[key] = st.secrets[key]
-    except Exception:  # noqa: BLE001 — no st.secrets outside Streamlit runtime
-        pass
-
-
 _load_env()
-_load_secrets()
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# Service-role key is only used by the seed script (local .env), so it can stay
+# a module constant. The dashboard keys are read lazily in get_client() instead —
+# Streamlit Cloud caches imported modules between reruns, so reading secrets at
+# import time would miss secrets added after the app started.
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 _client: Client | None = None
+
+
+def _get_secret(key: str) -> str:
+    """Read from env, falling back to st.secrets (Streamlit Cloud).
+
+    Called lazily on every client creation so secrets added after app start are
+    picked up without a full process restart.
+    """
+    value = os.environ.get(key, "")
+    if value:
+        return value
+    try:
+        import streamlit as st
+
+        return st.secrets.get(key, "")
+    except Exception:  # noqa: BLE001 — no st.secrets outside Streamlit runtime
+        return ""
 
 
 def get_client() -> Client:
     """Client bound to the signed-in session (or anon if not signed in)."""
     global _client
     if _client is None:
-        if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-            raise RuntimeError("SUPABASE_URL / SUPABASE_ANON_KEY not set in .env")
-        _client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+        url = _get_secret("SUPABASE_URL")
+        anon = _get_secret("SUPABASE_ANON_KEY")
+        if not url or not anon:
+            raise RuntimeError(
+                "SUPABASE_URL / SUPABASE_ANON_KEY not set — add to .env "
+                "or Streamlit Cloud → Settings → Secrets"
+            )
+        _client = create_client(url, anon)
     return _client
 
 
@@ -62,7 +73,7 @@ def get_service_client() -> Client:
     """Admin client (bypasses RLS) — used only by the seed script."""
     if not SUPABASE_SERVICE_ROLE_KEY:
         raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY not set in .env")
-    return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    return create_client(_get_secret("SUPABASE_URL"), SUPABASE_SERVICE_ROLE_KEY)
 
 
 def sign_in(email: str, password: str) -> None:
