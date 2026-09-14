@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 from scipy import stats
 
+from data import csv_download
 from supabase_client import query
 
 st.set_page_config(page_title="Experiments", page_icon="🧪", layout="wide")
@@ -34,6 +35,11 @@ for exp_id, g in df.groupby("experiment_id"):
     table["conversion"] = (table["conversion"] * 100).round(2)
     table.columns = ["Вариант", "Назначено", "Конверсий", "Конверсия %"]
     st.dataframe(table, width="stretch")
+    csv_download(
+        table,
+        filename=f"experiment_{g['experiment_id'].iloc[0]}.csv",
+        key=f"exp_{exp_id}",
+    )
 
     control = g[g["variant"] == "control"]
     treatment = g[g["variant"] != "control"]
@@ -46,7 +52,9 @@ for exp_id, g in df.groupby("experiment_id"):
     conv_t, n_t = int(t["converted"]), int(t["assigned"])
 
     lift = (conv_t / n_t - conv_c / n_c) / (conv_c / n_c) if conv_c and n_c else None
-    chi2, p = stats.chi2_contingency([[conv_c, n_c - conv_c], [conv_t, n_t - conv_t]])[:2]
+    chi2, p = stats.chi2_contingency([[conv_c, n_c - conv_c], [conv_t, n_t - conv_t]])[
+        :2
+    ]
 
     c1, c2 = st.columns(2)
     c1.metric("Lift vs control", f"{lift * 100:+.1f}%" if lift is not None else "—")

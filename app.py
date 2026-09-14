@@ -36,9 +36,10 @@ retention = st.Page("pages/retention.py", title="Retention", icon="🔁")
 revenue = st.Page("pages/revenue.py", title="Revenue", icon="💰")
 segments = st.Page("pages/segments.py", title="Segments", icon="🎯")
 experiments = st.Page("pages/experiments.py", title="Experiments", icon="🧪")
+events = st.Page("pages/events.py", title="Events", icon="📡")
 
 pg = st.navigation(
-    [overview, funnel, retention, revenue, segments, experiments],
+    [overview, funnel, retention, revenue, segments, experiments, events],
     position="sidebar",
 )
 st.sidebar.divider()

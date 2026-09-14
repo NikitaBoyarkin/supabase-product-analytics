@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from data import PLAN_MRR, arpu, get_data, mrr_series
+from data import PLAN_MRR, arpu, csv_download, get_data, mrr_series
 
 data = get_data()
 users = data["users"]
@@ -38,7 +38,9 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric("Current MRR", f"${current_mrr:,.0f}")
 c2.metric("Paid users (ever)", f"{paid:,}")
 c3.metric("ARPU (per total user)", f"${arpu_val:,.2f}")
-c4.metric("Logo churn (period)", f"{logo_churn:.1%}", delta="-" if logo_churn > 0 else "0")
+c4.metric(
+    "Logo churn (period)", f"{logo_churn:.1%}", delta="-" if logo_churn > 0 else "0"
+)
 
 st.divider()
 
@@ -48,11 +50,10 @@ st.plotly_chart(fig, width="stretch")
 
 st.subheader("MRR by plan")
 plans = list(PLAN_MRR.keys())
-fig2 = px.bar(
-    ms, x="month", y=plans, title="MRR by plan (stacked)", barmode="stack"
-)
+fig2 = px.bar(ms, x="month", y=plans, title="MRR by plan (stacked)", barmode="stack")
 fig2.update_layout(height=360, xaxis_title=None, yaxis_title="MRR ($)")
 st.plotly_chart(fig2, width="stretch")
 
 with st.expander("Raw monthly MRR table"):
     st.dataframe(ms, width="stretch", hide_index=True)
+    csv_download(ms, filename="mrr_monthly.csv", key="mrr_monthly")

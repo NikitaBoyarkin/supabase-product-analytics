@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import plotly.express as px
 import streamlit as st
 
-from data import get_data
+from data import csv_download, get_data
 
 data = get_data()
 users = data["users"]
@@ -16,7 +16,9 @@ events = data["events"]
 subs = data["subscriptions"]
 
 st.title("🎯 Segments")
-st.caption("Distributions, conversion, and ARPU across segment / channel / country / device.")
+st.caption(
+    "Distributions, conversion, and ARPU across segment / channel / country / device."
+)
 
 sub_uids = set(events.loc[events["event_name"] == "subscribe", "user_id"])
 sub_rev = subs.groupby("user_id")["mrr"].first()
@@ -57,3 +59,4 @@ st.subheader("Conversion & ARPU by dimension")
 dim = st.selectbox("Dimension", ["segment", "channel", "country", "device"])
 g = _dist(dim)
 st.dataframe(g, width="stretch", hide_index=True)
+csv_download(g, filename=f"segments_{dim}.csv", key=f"segments_{dim}")

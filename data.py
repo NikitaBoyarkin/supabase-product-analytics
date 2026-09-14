@@ -8,6 +8,7 @@ Heavy lifting (event stream, joins, RLS) lives in the database; the metric
 helpers below are pure-pandas reshapers that keep the exact shapes the pages
 expect. SQL-side analytics views are in ``sql/002_views.sql``.
 """
+
 from __future__ import annotations
 
 import pandas as pd
@@ -32,7 +33,9 @@ def get_data() -> dict[str, pd.DataFrame]:
     users = pd.DataFrame(users_rows)
     if not users.empty:
         users["user_id"] = users["external_id"]
-        users["signup_date"] = pd.to_datetime(users["created_at"], format="mixed").dt.tz_localize(None)
+        users["signup_date"] = pd.to_datetime(
+            users["created_at"], format="mixed"
+        ).dt.tz_localize(None)
         props = users["properties"].apply(pd.Series)
         for col in ("channel", "country", "device", "segment"):
             if col not in props.columns:
@@ -40,18 +43,31 @@ def get_data() -> dict[str, pd.DataFrame]:
             # Ingested users may lack a property key → NaN breaks sorted()/groupby
             props[col] = props[col].fillna("unknown")
         users = pd.concat(
-            [users[["user_id", "signup_date"]], props[["channel", "country", "device", "segment"]]],
+            [
+                users[["user_id", "signup_date"]],
+                props[["channel", "country", "device", "segment"]],
+            ],
             axis=1,
         )
         users["signup_month"] = users["signup_date"].dt.to_period("M")
     else:
         users = pd.DataFrame(
-            columns=["user_id", "signup_date", "channel", "country", "device", "segment", "signup_month"]
+            columns=[
+                "user_id",
+                "signup_date",
+                "channel",
+                "country",
+                "device",
+                "segment",
+                "signup_month",
+            ]
         )
 
     events = pd.DataFrame(events_rows)
     if not events.empty:
-        events["event_date"] = pd.to_datetime(events["event_time"], format="mixed").dt.tz_localize(None)
+        events["event_date"] = pd.to_datetime(
+            events["event_time"], format="mixed"
+        ).dt.tz_localize(None)
     else:
         events = pd.DataFrame(columns=["user_id", "event_name", "event_date"])
 
@@ -61,7 +77,9 @@ def get_data() -> dict[str, pd.DataFrame]:
         subs["churn_date"] = pd.to_datetime(subs["churn_date"])
         subs["churned"] = subs["churn_date"].notna()
     else:
-        subs = pd.DataFrame(columns=["user_id", "plan", "mrr", "start_date", "churn_date", "churned"])
+        subs = pd.DataFrame(
+            columns=["user_id", "plan", "mrr", "start_date", "churn_date", "churned"]
+        )
 
     return {"users": users, "events": events, "subscriptions": subs}
 
@@ -99,12 +117,18 @@ def cohort_retention_matrix(
         users[["user_id", "signup_month"]], on="user_id"
     )
     act["event_month"] = act["event_date"].dt.to_period("M")
-    act["month_index"] = act["event_month"].astype("int64") - act["signup_month"].astype("int64")
+    act["month_index"] = act["event_month"].astype("int64") - act[
+        "signup_month"
+    ].astype("int64")
     act = act[(act["month_index"] >= 0) & (act["month_index"] <= max_months)]
     if act.empty:
         return pd.DataFrame()
     cohort_sizes = users.groupby("signup_month").size()
-    mat = act.groupby(["signup_month", "month_index"])["user_id"].nunique().unstack(fill_value=0)
+    mat = (
+        act.groupby(["signup_month", "month_index"])["user_id"]
+        .nunique()
+        .unstack(fill_value=0)
+    )
     mat = mat.reindex(cohort_sizes.index)
     pct = (mat.div(cohort_sizes, axis=0) * 100).round(1)
     return pct
@@ -116,7 +140,10 @@ def mrr_series(subs: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for m in months:
         me = m.to_timestamp("M")
-        active = subs[(subs["start_date"] <= me) & ((~subs["churned"]) | (subs["churn_date"] > me))]
+        active = subs[
+            (subs["start_date"] <= me)
+            & ((~subs["churned"]) | (subs["churn_date"] > me))
+        ]
         row: dict = {"month": str(m), "mrr": float(active["mrr"].sum())}
         for p in PLAN_MRR:
             row[p] = float(active.loc[active["plan"] == p, "mrr"].sum())
@@ -133,6 +160,74 @@ def conversion_by_channel(users: pd.DataFrame, events: pd.DataFrame) -> pd.DataF
 
 
 def arpu(subs: pd.DataFrame, users: pd.DataFrame, asof=PERIOD_END) -> float:
-    active = subs[(subs["start_date"] <= asof) & ((~subs["churned"]) | (subs["churn_date"] > asof))]
+    active = subs[
+        (subs["start_date"] <= asof)
+        & ((~subs["churned"]) | (subs["churn_date"] > asof))
+    ]
     denom = max(len(users), 1)
     return float(active["mrr"].sum()) / denom
+
+
+# --- Phase 4 helpers (REQ-009, REQ-010, REQ-011) ---------------------------
+DIMENSIONS = ["segment", "channel", "country", "device"]
+
+
+def funnel_by_dimension(
+    users: pd.DataFrame, events: pd.DataFrame, dimension: str
+) -> pd.DataFrame:
+    """Distinct users per funnel step, grouped by a user dimension.
+
+    Returns a DataFrame with one row per dimension value and one column per
+    funnel step (plus the dimension column). Steps with no events are zero-filled.
+    """
+    if dimension not in DIMENSIONS:
+        raise ValueError(f"dimension must be one of {DIMENSIONS}")
+    cols = [dimension] + FUNNEL_STEPS
+    if users.empty or events.empty:
+        return pd.DataFrame(columns=cols)
+    act = events.merge(users[["user_id", dimension]], on="user_id", how="inner")
+    act = act[act["event_name"].isin(FUNNEL_STEPS)]
+    if act.empty:
+        return pd.DataFrame(columns=cols)
+    pivot = act.pivot_table(
+        index=dimension,
+        columns="event_name",
+        values="user_id",
+        aggfunc="nunique",
+        fill_value=0,
+    )
+    for step in FUNNEL_STEPS:
+        if step not in pivot.columns:
+            pivot[step] = 0
+    return pivot[FUNNEL_STEPS].reset_index()
+
+
+def event_frequency(events: pd.DataFrame) -> pd.DataFrame:
+    """Event counts by event_name, sorted descending."""
+    if events.empty:
+        return pd.DataFrame(columns=["event_name", "count"])
+    return (
+        events.groupby("event_name")
+        .size()
+        .reset_index(name="count")
+        .sort_values("count", ascending=False)
+        .reset_index(drop=True)
+    )
+
+
+def csv_download(
+    df: pd.DataFrame,
+    label: str = "⬇️ Скачать CSV",
+    filename: str = "export.csv",
+    key=None,
+):
+    """Streamlit download button for a non-empty DataFrame."""
+    if df is None or df.empty:
+        return None
+    return st.download_button(
+        label,
+        df.to_csv(index=False).encode("utf-8"),
+        file_name=filename,
+        mime="text/csv",
+        key=key,
+    )

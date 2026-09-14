@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import plotly.graph_objects as go
 import streamlit as st
 
-from data import cohort_retention_matrix, get_data
+from data import cohort_retention_matrix, csv_download, get_data
 
 data = get_data()
 users = data["users"]
@@ -58,3 +58,4 @@ else:
     disp = pct.copy()
     disp.index = disp.index.astype(str)
     st.dataframe(disp, width="stretch")
+    csv_download(disp, filename="retention_matrix.csv", key="retention_matrix")

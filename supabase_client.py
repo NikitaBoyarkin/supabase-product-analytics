@@ -5,6 +5,7 @@ through Row Level Security: the user only ever sees rows belonging to their
 organization. No service-role key is used at runtime — it is only needed by
 ``scripts/seed_events.py`` for admin operations.
 """
+
 from __future__ import annotations
 
 import os
@@ -92,6 +93,54 @@ def is_authenticated() -> bool:
 
 
 _PAGE = 1000  # PostgREST db-max-rows cap on Supabase
+
+
+def send_ingest_event(
+    user_id: str,
+    event_name: str,
+    properties: dict | None = None,
+    timestamp: str | None = None,
+) -> dict:
+    """POST a custom event to the Edge Function ingest endpoint (server-side).
+
+    Returns the parsed JSON response (``{"accepted": true, "event_id": ...}`` on
+    success, an ``{"error": ...}`` body on a 4xx/5xx). Raises RuntimeError when
+    the endpoint is unreachable or required secrets are missing.
+    """
+    import json
+    import urllib.error
+    import urllib.request
+
+    base = _get_secret("SUPABASE_URL")
+    api_key = _get_secret("INGEST_API_KEY")
+    if not base or not api_key:
+        raise RuntimeError(
+            "SUPABASE_URL / INGEST_API_KEY not set — add to .env or secrets"
+        )
+    url = f"{base.rstrip('/')}/functions/v1/ingest"
+
+    payload: dict = {"user_id": str(user_id), "event_name": event_name}
+    if properties:
+        payload["properties"] = properties
+    if timestamp:
+        payload["timestamp"] = timestamp
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "x-api-key": api_key},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            return json.loads(e.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001 — non-JSON error body
+            return {"error": f"HTTP {e.code}"}
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"ingest unreachable: {e.reason}") from e
 
 
 def query(schema: str, table: str, columns: str = "*") -> list[dict]:

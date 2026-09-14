@@ -103,14 +103,17 @@ Returns `202` on success, `401` on a bad key, `400` on an invalid body.
    `security definer` ingest.
 5. **Reuse**: the dashboard UI was reused from an existing Streamlit app —
    only the data layer changed.
+6. **Phase 4 extras**: funnel breakdown by segment/channel/country/device,
+   CSV export on every table, and an Events page that sends custom events
+   through the same ingest API (needs `INGEST_API_KEY`).
 
 ## Repo layout
 
 ```
-├── app.py                    # auth gate + st.navigation (6 pages)
-├── supabase_client.py       # RLS-scoped query layer (paginated)
+├── app.py                    # auth gate + st.navigation (7 pages)
+├── supabase_client.py       # RLS-scoped query layer (paginated) + ingest client
 ├── data.py                  # SQL-backed data layer, API-compatible with streamlit-app
-├── pages/                   # overview, funnel, retention, revenue, segments, experiments
+├── pages/                   # overview, funnel, retention, revenue, segments, experiments, events
 ├── sql/                     # migrations 001–005
 ├── supabase/functions/ingest/  # Edge Function (Deno)
 └── scripts/seed_events.py   # deterministic synthetic dataset + A/B experiment

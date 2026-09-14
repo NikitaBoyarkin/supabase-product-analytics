@@ -14,7 +14,9 @@ from data import (
     PERIOD_START,
     active_users,
     conversion_by_channel,
+    csv_download,
     daily_active_users,
+    event_frequency,
     get_data,
 )
 
@@ -50,7 +52,9 @@ sub_sel = subs[subs["user_id"].isin(u_ids)]
 total_users = len(us)
 paid = sub_sel["user_id"].nunique()
 mrr_now = float(sub_sel.loc[~sub_sel["churned"], "mrr"].sum())
-au30 = active_users(events[events["user_id"].isin(u_ids)], end - pd.Timedelta(days=30), end)
+au30 = active_users(
+    events[events["user_id"].isin(u_ids)], end - pd.Timedelta(days=30), end
+)
 conv = paid / total_users if total_users else 0
 stick = au30 / total_users if total_users else 0
 
@@ -65,7 +69,9 @@ st.divider()
 
 dau = daily_active_users(ev)
 if not dau.empty:
-    fig = px.area(dau.reset_index(name="DAU"), x="event_date", y="DAU", title="Daily Active Users")
+    fig = px.area(
+        dau.reset_index(name="DAU"), x="event_date", y="DAU", title="Daily Active Users"
+    )
     fig.update_layout(height=320, xaxis_title=None, yaxis_title=None)
     st.plotly_chart(fig, width="stretch")
 
@@ -80,8 +86,27 @@ c_l.plotly_chart(fig_s, width="stretch")
 conv_df = conversion_by_channel(us, events).reset_index()
 conv_df["conversion"] = (conv_df["conversion"] * 100).round(1)
 fig_c = px.bar(
-    conv_df, x="channel", y="conversion", text="conversion", title="Signup→Paid conversion by channel (%)"
+    conv_df,
+    x="channel",
+    y="conversion",
+    text="conversion",
+    title="Signup→Paid conversion by channel (%)",
 )
 fig_c.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
 fig_c.update_layout(height=360)
 c_r.plotly_chart(fig_c, width="stretch")
+
+st.divider()
+with st.expander("Event frequency by name"):
+    freq = event_frequency(ev)
+    if freq.empty:
+        st.info("Нет событий в выбранном срезе.")
+    else:
+        fig_e = px.bar(
+            freq, x="event_name", y="count", title="Events by name", text="count"
+        )
+        fig_e.update_traces(textposition="outside")
+        fig_e.update_layout(height=320, xaxis_title=None, yaxis_title="events")
+        st.plotly_chart(fig_e, width="stretch")
+        st.dataframe(freq, width="stretch", hide_index=True)
+        csv_download(freq, filename="events_frequency.csv", key="overview_events_freq")

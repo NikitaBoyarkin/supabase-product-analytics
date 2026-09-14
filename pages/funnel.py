@@ -9,7 +9,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from data import FUNNEL_STEPS, funnel_counts, get_data
+from data import (
+    FUNNEL_STEPS,
+    csv_download,
+    funnel_by_dimension,
+    funnel_counts,
+    get_data,
+)
 
 data = get_data()
 users = data["users"]
@@ -20,10 +26,18 @@ st.caption("app_open → signup → activate → start_trial → subscribe")
 
 with st.sidebar:
     st.header("Funnel filters")
-    seg = st.multiselect("Segment", sorted(users["segment"].unique()), sorted(users["segment"].unique()))
-    ch = st.multiselect("Channel", sorted(users["channel"].unique()), sorted(users["channel"].unique()))
-    dev = st.multiselect("Device", sorted(users["device"].unique()), sorted(users["device"].unique()))
-    ctry = st.multiselect("Country", sorted(users["country"].unique()), sorted(users["country"].unique()))
+    seg = st.multiselect(
+        "Segment", sorted(users["segment"].unique()), sorted(users["segment"].unique())
+    )
+    ch = st.multiselect(
+        "Channel", sorted(users["channel"].unique()), sorted(users["channel"].unique())
+    )
+    dev = st.multiselect(
+        "Device", sorted(users["device"].unique()), sorted(users["device"].unique())
+    )
+    ctry = st.multiselect(
+        "Country", sorted(users["country"].unique()), sorted(users["country"].unique())
+    )
 
 mask = (
     users["segment"].isin(seg)
@@ -68,3 +82,39 @@ for step in FUNNEL_STEPS:
     )
 prev = c
 st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+csv_download(
+    pd.DataFrame(rows),
+    filename="funnel_dropoff.csv",
+    key="funnel_dropoff",
+)
+
+st.divider()
+st.subheader("Funnel by dimension")
+dim = st.selectbox("Dimension", ["segment", "channel", "country", "device"])
+fbd = funnel_by_dimension(users, ev, dim)
+if fbd.empty or fbd[FUNNEL_STEPS].sum().sum() == 0:
+    st.info("Нет данных по выбранной размерности в текущем срезе.")
+else:
+    plot_df = fbd.melt(id_vars=dim, var_name="step", value_name="users")
+    fig2 = go.Figure()
+    for step in FUNNEL_STEPS:
+        step_df = plot_df[plot_df["step"] == step]
+        fig2.add_trace(
+            go.Bar(
+                x=step_df[dim], y=step_df["users"], name=step, marker_color="#4DA8DA"
+            )
+        )
+    fig2.update_layout(
+        height=420,
+        barmode="group",
+        xaxis_title=None,
+        yaxis_title="distinct users",
+        title=f"Funnel by {dim}",
+    )
+    st.plotly_chart(fig2, width="stretch")
+
+    tbl = fbd.copy()
+    tbl["overall conversion"] = tbl["subscribe"] / tbl["app_open"].replace(0, pd.NA)
+    tbl["overall conversion"] = (tbl["overall conversion"] * 100).round(1)
+    st.dataframe(tbl, width="stretch", hide_index=True)
+    csv_download(tbl, filename=f"funnel_by_{dim}.csv", key=f"funnel_dim_{dim}")
