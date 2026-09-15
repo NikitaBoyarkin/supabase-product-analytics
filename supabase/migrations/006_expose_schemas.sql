@@ -1,0 +1,1 @@
+../../sql/006_expose_schemas.sql

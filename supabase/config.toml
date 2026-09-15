@@ -1,0 +1,16 @@
+# Minimal hosted config — this repo deploys to a hosted Supabase project
+# (no local docker stack). Only the Data API schema exposure and the ingest
+# function's JWT mode are managed here; auth/storage/etc. keep hosted defaults.
+
+project_id = "feqhphmtldgjocjrydek"
+
+[api]
+enabled = true
+# Tables, views and RPCs in these schemas get REST endpoints. The demo app
+# queries `analytics` + `experiments` alongside the default `public`.
+schemas = ["public", "graphql_public", "analytics", "experiments"]
+extra_search_path = ["public", "extensions"]
+
+[functions.ingest]
+# The ingest endpoint is gated by its own x-api-key (hashed in the DB), not a JWT.
+verify_jwt = false

@@ -62,6 +62,13 @@ create policy "org scoped select" on analytics.events
 | `003_experiments.sql` | `experiments` tables + `v_results` (SQL-computed conversion) |
 | `004_rls.sql` | RLS policies, `my_orgs()` helper, `ingest_event()` security definer |
 | `005_service_role_grants.sql` | Grants for the seed script (service role) |
+| `006_expose_schemas.sql` | Expose `analytics` + `experiments` to PostgREST (`pgrst.db_schemas`) |
+| `007_expose_schemas_clean.sql` | Same, comma-separated without spaces (PostgREST parse safety) |
+| `008_authenticator_grants.sql` | `USAGE` on custom schemas for the `authenticator` role |
+
+Schemas are also declared in `supabase/config.toml` → `[api].schemas` (managed via
+`supabase config push`); migrations are symlinked into `supabase/migrations/` so
+`supabase db push` applies them in order on a fresh project.
 
 ## Setup
 
@@ -84,7 +91,7 @@ Demo login (created by the seed): `demo@acme-saas.dev` / `demo-password-123`.
 ## Ingest API
 
 ```bash
-curl -X POST "https://geojpakugqlcwyhtnjvv.supabase.co/functions/v1/ingest" \
+curl -X POST "https://feqhphmtldgjocjrydek.supabase.co/functions/v1/ingest" \
   -H "x-api-key: sb_analytics_<your_key>" \
   -H "Content-Type: application/json" \
   -d '{"user_id":"u00001","event_name":"signup","properties":{"channel":"organic"}}'
@@ -98,7 +105,9 @@ Returns `202` on success, `401` on a bad key, `400` on an invalid body.
    not just pandas.
 2. **Analytics in the DB**: funnel/retention/MRR as SQL views, not Python.
 3. **A/B experiment end-to-end**: assignments → metrics → `v_results` →
-   χ² significance (control 32.1% vs treatment 37.2%, **p = 0.0034**).
+   χ² significance (control 29.6% vs treatment 40.7%, **p ≈ 1.7e-10**).
+   Deterministic seed: assignment fetch is ordered by id so re-seeds reproduce
+   the same numbers.
 4. **Security**: API keys stored as hashes, RLS verified (anon sees 0 rows),
    `security definer` ingest.
 5. **Reuse**: the dashboard UI was reused from an existing Streamlit app —

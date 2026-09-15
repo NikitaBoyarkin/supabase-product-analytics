@@ -6,6 +6,7 @@ Run: ``uv run python scripts/seed_events.py``
 The synthetic generator mirrors ``streamlit-app/data.py`` (seed = 42) so the
 dashboard shows the same familiar dataset — but now served from Postgres.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -17,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from supabase_client import SUPABASE_SERVICE_ROLE_KEY, get_service_client  # noqa: E402
+from supabase_client import SUPABASE_SERVICE_ROLE_KEY, get_service_client
 
 # --- Synthetic dataset config (mirrors streamlit-app/data.py) ---------------
 RNG_SEED = 42
@@ -70,23 +71,51 @@ def generate() -> dict[str, pd.DataFrame]:
     end_np = np.datetime64(PERIOD_END, "ns")
 
     parts: list[pd.DataFrame] = []
-    parts.append(pd.DataFrame({"user_id": uids, "event_date": sds, "event_name": "app_open"}))
-    parts.append(pd.DataFrame({"user_id": uids, "event_date": sds, "event_name": "signup"}))
+    parts.append(
+        pd.DataFrame({"user_id": uids, "event_date": sds, "event_name": "app_open"})
+    )
+    parts.append(
+        pd.DataFrame({"user_id": uids, "event_date": sds, "event_name": "signup"})
+    )
 
     activated = rng.random(n) < 0.70
     act_dates = sds + rng.integers(1, 11, size=n) * np.timedelta64(1, "D")
     keep = activated & (act_dates <= end_np)
-    parts.append(pd.DataFrame({"user_id": uids[keep], "event_date": act_dates[keep], "event_name": "activate"}))
+    parts.append(
+        pd.DataFrame(
+            {
+                "user_id": uids[keep],
+                "event_date": act_dates[keep],
+                "event_name": "activate",
+            }
+        )
+    )
 
     trialed = activated & (rng.random(n) < 0.55)
     trial_dates = sds + rng.integers(3, 12, size=n) * np.timedelta64(1, "D")
     keep = trialed & (trial_dates <= end_np)
-    parts.append(pd.DataFrame({"user_id": uids[keep], "event_date": trial_dates[keep], "event_name": "start_trial"}))
+    parts.append(
+        pd.DataFrame(
+            {
+                "user_id": uids[keep],
+                "event_date": trial_dates[keep],
+                "event_name": "start_trial",
+            }
+        )
+    )
 
     subscribed = trialed & (rng.random(n) < 0.35)
     sub_dates = trial_dates + rng.integers(2, 10, size=n) * np.timedelta64(1, "D")
     keep_sub = subscribed & (sub_dates <= end_np)
-    parts.append(pd.DataFrame({"user_id": uids[keep_sub], "event_date": sub_dates[keep_sub], "event_name": "subscribe"}))
+    parts.append(
+        pd.DataFrame(
+            {
+                "user_id": uids[keep_sub],
+                "event_date": sub_dates[keep_sub],
+                "event_name": "subscribe",
+            }
+        )
+    )
 
     max_weeks = 80
     tau = rng.exponential(scale=8.0, size=n)
@@ -99,7 +128,11 @@ def generate() -> dict[str, pd.DataFrame]:
     keep = active_dates <= end_np
     parts.append(
         pd.DataFrame(
-            {"user_id": uids[ui][keep], "event_date": active_dates[keep], "event_name": "active"}
+            {
+                "user_id": uids[ui][keep],
+                "event_date": active_dates[keep],
+                "event_name": "active",
+            }
         )
     )
 
@@ -113,7 +146,9 @@ def generate() -> dict[str, pd.DataFrame]:
     plans = rng.choice(plan_keys, size=len(sub_uids), p=[PLAN_P[k] for k in plan_keys])
     mrr = np.array([PLAN_MRR[p] for p in plans], dtype=float)
     churned_raw = rng.random(len(sub_uids)) < 0.30
-    raw_churn_date = sub_starts + rng.integers(1, 7, size=len(sub_uids)) * np.timedelta64(30, "D")
+    raw_churn_date = sub_starts + rng.integers(
+        1, 7, size=len(sub_uids)
+    ) * np.timedelta64(30, "D")
     final_churn = churned_raw & (raw_churn_date <= end_np)
     churn_date = np.where(final_churn, raw_churn_date, np.datetime64("NaT", "ns"))
 
@@ -140,7 +175,9 @@ def seed_experiment(client, ext_to_id: dict[str, int], events: pd.DataFrame) -> 
     Effect size is chosen so the result is statistically significant at the
     seeded sample size (n≈1500 per variant): 30% → 36% conversion.
     """
-    trial_uids = sorted(set(events.loc[events["event_name"] == "start_trial", "user_id"]))
+    trial_uids = sorted(
+        set(events.loc[events["event_name"] == "start_trial", "user_id"])
+    )
     rng = np.random.default_rng(7)
     rng.shuffle(trial_uids)
     half = len(trial_uids) // 2
@@ -181,10 +218,18 @@ def seed_experiment(client, ext_to_id: dict[str, int], events: pd.DataFrame) -> 
     )
 
     assign_rows = [
-        {"experiment_id": exp_id, "user_id": ext_to_id[uid], "variant_id": v_control["id"]}
+        {
+            "experiment_id": exp_id,
+            "user_id": ext_to_id[uid],
+            "variant_id": v_control["id"],
+        }
         for uid in control
     ] + [
-        {"experiment_id": exp_id, "user_id": ext_to_id[uid], "variant_id": v_treatment["id"]}
+        {
+            "experiment_id": exp_id,
+            "user_id": ext_to_id[uid],
+            "variant_id": v_treatment["id"],
+        }
         for uid in treatment
     ]
     for batch in chunked(assign_rows):
@@ -198,6 +243,7 @@ def seed_experiment(client, ext_to_id: dict[str, int], events: pd.DataFrame) -> 
             .from_("assignments")
             .select("id,variant_id")
             .eq("experiment_id", exp_id)
+            .order("id")  # stable order — conversion draws depend on fetch order
             .range(offset, offset + 999)
             .execute()
             .data
@@ -211,14 +257,26 @@ def seed_experiment(client, ext_to_id: dict[str, int], events: pd.DataFrame) -> 
     metrics = []
     for a in fetched:
         key = vmap[a["variant_id"]]
-        conv = 1 if rng.random() < (base_conv if key == "control" else base_conv * (1 + lift)) else 0
+        conv = (
+            1
+            if rng.random()
+            < (base_conv if key == "control" else base_conv * (1 + lift))
+            else 0
+        )
         metrics.append(
-            {"experiment_id": exp_id, "assignment_id": a["id"], "metric_name": "conversion", "value": conv}
+            {
+                "experiment_id": exp_id,
+                "assignment_id": a["id"],
+                "metric_name": "conversion",
+                "value": conv,
+            }
         )
     for batch in chunked(metrics):
         client.schema("experiments").from_("metrics").insert(batch).execute()
 
-    print(f"experiment: {len(control) + len(treatment)} assigned, {len(metrics)} metric rows")
+    print(
+        f"experiment: {len(control) + len(treatment)} assigned, {len(metrics)} metric rows"
+    )
 
 
 def main() -> None:
@@ -228,7 +286,9 @@ def main() -> None:
             "copy from dashboard → Settings → API → service_role (secret)"
         )
     if not INGEST_API_KEY:
-        sys.exit("INGEST_API_KEY missing in .env — needed to register the ingest api key")
+        sys.exit(
+            "INGEST_API_KEY missing in .env — needed to register the ingest api key"
+        )
     client = get_service_client()
 
     # 1. org + api key (idempotent)
@@ -329,7 +389,9 @@ def main() -> None:
                 "plan": r["plan"],
                 "mrr": float(r["mrr"]),
                 "start_date": r["start_date"].date().isoformat(),
-                "churn_date": None if pd.isna(r["churn_date"]) else r["churn_date"].date().isoformat(),
+                "churn_date": None
+                if pd.isna(r["churn_date"])
+                else r["churn_date"].date().isoformat(),
             }
         )
     for batch in chunked(sub_rows):

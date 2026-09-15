@@ -51,7 +51,7 @@ Full-stack портфолио-платформа продуктовой анал
 - **Метрика:** p-value χ²-теста.
 - **Baseline:** n/a.
 - **Target:** p < 0.05 с понятной интерпретацией.
-- **Срок:** 2026-08-14 (достигнуто: control 32.1% vs treatment 37.2%, p = 0.0034).
+- **Срок:** 2026-08-14 → 2026-09-15 (достигнуто: control 29.6% vs treatment 40.7%, p ≈ 1.7e-10).
 - **Метод измерения:** χ² на таблице конверсий `experiments.v_results`.
 
 ## 4. User Stories
@@ -126,7 +126,7 @@ analytics.ingest_event(p_key_hash, p_external_id, p_event_name, p_properties, p_
 - [ ] API-ключи хранятся только как `key_hash` (SHA-256, `unique`) — plaintext нигде не персистится
 - [ ] `unique(organization_id, external_id)` на юзерах — внешний ID уникален внутри организации
 - [ ] Индексы по `(organization_id, event_name, event_time)` и `(organization_id, user_id)`
-- [ ] Миграции идемпотентны (`create table if not exists`) и запускаются по порядку 001–005
+- [ ] Миграции идемпотентны (`create table if not exists`) и запускаются по порядку 001–008
 
 **Техническая спецификация:**
 ```
@@ -226,7 +226,7 @@ data.py: get_data() @st.cache_data(ttl=300) → query("analytics", "users|v_even
 - [ ] `v_results` возвращает для каждого варианта: assigned, converted, conversion (round 4)
 - [ ] conversion считается как `count(metrics where metric_name='conversion' and value>0) / count(distinct assignments)`
 - [ ] Страница Experiments показывает таблицу вариантов + Lift vs control + p-value (χ²)
-- [ ] p < 0.05 → «Статистически значимо»; иначе — «Не значимо» (в тесте: control 32.1%, treatment 37.2%, p = 0.0034)
+- [ ] p < 0.05 → «Статистически значимо»; иначе — «Не значимо» (в тесте: control 29.6%, treatment 40.7%, p ≈ 1.7e-10)
 - [ ] Эксперименты изолированы по организации через RLS (v_results + таблицы)
 
 **Техническая спецификация:**
@@ -354,7 +354,7 @@ experiments.v_results: group by x.id, x.name, x.status, v.key
 ### Технологический стек
 - **Frontend:** Streamlit 1.61, `st.navigation`, 6 страниц
 - **Backend:** Supabase Edge Functions (Deno, supabase-js), RPC `analytics.ingest_event`
-- **Database:** Supabase Postgres 17; схемы `analytics` + `experiments`; 5 миграций
+- **Database:** Supabase Postgres 17; схемы `analytics` + `experiments`; 8 миграций
 - **Infrastructure:** Supabase Cloud; Streamlit Community Cloud (деплой в процессе)
 
 ### Внешние зависимости
@@ -363,7 +363,7 @@ experiments.v_results: group by x.id, x.name, x.status, v.key
 3. **scipy:** χ²-тест на странице Experiments
 
 ### Миграция (для существующих систем)
-1. Миграции 001–005 идемпотентны, применяются по порядку в Supabase SQL Editor
+1. Миграции 001–008 идемпотентны, применяются по порядку: `supabase link` → `supabase db push`
 2. Данные пересоздаются детерминированно: `uv run python scripts/seed_events.py`
 3. Откат: дропнуть схемы `analytics`/`experiments` и переприменить миграции
 4. Деплой на Cloud: фикс ленивого чтения секретов (`1c2ca16`) уже в main
@@ -397,7 +397,7 @@ experiments.v_results: group by x.id, x.name, x.status, v.key
 **Tasks:**
 - [x] `003_experiments.sql` + `v_results` (REQ-006) — Medium (6h)
 - [x] `005_service_role_grants`, секреты в .gitignore (REQ-003) — Small (2h)
-**Validation Checkpoint:** p = 0.0034 на странице Experiments; ingest-ключ в репо — плейсхолдер.
+**Validation Checkpoint:** p ≈ 1.7e-10 на странице Experiments; ingest-ключ в репо — плейсхолдер.
 
 ### Phase 4: Аппетиты (реализовано, 2026-09-15)
 **Goal:** сегментная воронка, экспорт, custom events.
@@ -434,10 +434,9 @@ Critical Path: 001_schema → 004_rls/ingest → seed → 002_views → dashboar
 
 ### Open Questions
 #### Q1: Деплой на Streamlit Cloud
-- **Статус:** фикс `1c2ca16` (ленивое чтение секретов) смержен в main; app не переключён на main/не пересоздан
+- **Статус:** проект пересоздан (`feqhphmtldgjocjrydek`, 2026-09-15): миграции 001–008 применены, seed залит, ingest задеплоен и протестирован live. Осталось: переключить/пересоздать app на Cloud с новыми секретами (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `INGEST_API_KEY`)
 - **Варианты:** (A) переключить app на main → проверить логин; (B) пересоздать app; (C) не деплоить (локальная демо)
 - **Владелец:** Nikita
-- **Дедлайн:** next session
 - **Влияние:** Medium (портфолио-витрина vs локальная демо)
 
 #### Q2: Публичность репо
@@ -445,9 +444,8 @@ Critical Path: 001_schema → 004_rls/ingest → seed → 002_views → dashboar
 - **Варианты:** (A) оставить приватным + ссылка по запросу; (B) сделать публичным после вычистки секретов
 - **Влияние:** Medium
 
-#### Q3: Тест живого ingest
-- **Статус:** curl-сценарии 202/401/400 описаны, живой вызов Edge Function не гонялся
-- **Варианты:** (A) прогнать curl на деплоенную функцию; (B) оставить как есть
+#### Q3: Тест живого ingest — ✅ закрыт (2026-09-15)
+- **Статус:** живой curl против деплоенной Edge Function: 202 (валидный ключ, event_id=82302), 401 (плохой ключ), 400 (пустой body), 400 (нет user_id), 405 (GET). Кастомное событие `feature_used` видно demo-юзером через RLS.
 - **Влияние:** Low
 
 ### Risks & Mitigation
@@ -471,8 +469,8 @@ Critical Path: 001_schema → 004_rls/ingest → seed → 002_views → dashboar
 ### Checkpoint 2: Конец Phase 3 (A/B)
 **Критерии:**
 - [ ] AppTest 6/6, smoke HTTP 200
-- [ ] Experiments: контроль 32.1% vs treatment 37.2%, p = 0.0034
-- [ ] Все 5 миграций применены идемпотентно; секреты не в git
+- [ ] Experiments: контроль 29.6% vs treatment 40.7%, p ≈ 1.7e-10
+- [ ] Все 8 миграций применены идемпотентно; секреты не в git
 **Если провален:** зафиксировать отклонение в статусе проекта (vault-заметка), не скрывать.
 
 ---
