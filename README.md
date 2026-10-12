@@ -1,5 +1,37 @@
 # Product Analytics + A/B Experiments (Supabase)
 
+> Full-stack analytics on Supabase Postgres — Edge Function ingest behind RLS, and a concluded A/B experiment: control 29.6% vs treatment 40.7%, p ≈ 1.7e-10.
+
+## Navigation
+- 🌐 [Portfolio site](https://nikitaboyarkin.github.io)
+- 🏦 [Flagship case: Volta neobank](https://github.com/NikitaBoyarkin/volta-banking)
+- 🧪 Related: [supabase-product-analytics](https://github.com/NikitaBoyarkin/supabase-product-analytics) · [streamlit-app](https://github.com/NikitaBoyarkin/streamlit-app) · [airflow](https://github.com/NikitaBoyarkin/airflow)
+
+**On this page:** [Situation](#situation) · [Task](#task) · [Actions](#actions) · [Result](#result) · [Architecture](#architecture) · [Security model](#security-model-rls) · [Schema](#schema-migrations) · [Setup](#setup) · [Ingest API](#ingest-api) · [What to show in a portfolio](#what-to-show-in-a-portfolio) · [Repo layout](#repo-layout)
+
+## Situation
+
+A standalone `streamlit-app` dashboard already existed, but its data layer was an in-memory generator — nothing persisted, nothing was access-controlled, and there was no real ingest path or experiment history.
+
+## Task
+
+Turn it into a full-stack product analytics platform: live **Supabase Postgres** read through **Row Level Security**, an **Edge Function** ingest API that accepts events by API key, and a concluded **A/B experiment** with SQL-computed conversion.
+
+## Actions
+
+- Designed two schemas: `analytics` (organizations, api_keys, users, events, subscriptions, org_members) and `experiments` (experiments, variants, assignments, metrics).
+- Pushed analytics into the DB: SQL views compute funnel, cohort retention, MRR, DAU, and channel conversion (`sql/002_views.sql`); `experiments.v_results` computes per-variant assigned/converted/conversion.
+- Enabled RLS on every table with an `analytics.my_orgs()` helper, so a user sees only their own org's rows.
+- Built the ingest Edge Function (`supabase/functions/ingest`, Deno): validates an API key stored as a SHA-256 hash and inserts the event via a `security definer` function.
+- Reused the dashboard UI from `streamlit-app` — swapped only the data layer, from an in-memory generator to RLS-scoped Postgres queries.
+- Ran the A/B significance test (χ²) on top of `v_results`.
+
+## Result
+
+- A/B experiment concluded: control 29.6% vs treatment 40.7%, **p ≈ 1.7e-10** (deterministic seed — re-seeds reproduce the same numbers).
+- Anonymous (no session) sees **0 rows** — verified.
+- Demo dataset seeded: 8k users, ~82k events, 1 A/B experiment, demo user.
+
 A full-stack product analytics platform: a Streamlit dashboard that reads live
 data from **Supabase Postgres** through **Row Level Security**, plus an
 **Edge Function** ingest API that accepts events by API key. Includes a
