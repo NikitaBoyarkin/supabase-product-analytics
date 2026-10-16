@@ -1,6 +1,6 @@
 # Product Analytics + A/B Experiments (Supabase)
 
-> Full-stack analytics on Supabase Postgres — Edge Function ingest behind RLS, and a concluded A/B experiment: control 29.6% vs treatment 40.7%, p ≈ 1.7e-10.
+> A/B experiment concluded at control 29.6% vs treatment 40.7% (p ≈ 1.7e-10) — an in-database experiment that any client, a Streamlit dashboard or plain SQL, reads back identically, on a full-stack Supabase Postgres platform: Edge Function ingest behind Row Level Security.
 
 ## Navigation
 - 🌐 [Portfolio site](https://nikitaboyarkin.github.io)
@@ -28,9 +28,11 @@ Turn it into a full-stack product analytics platform: live **Supabase Postgres**
 
 ## Result
 
-- A/B experiment concluded: control 29.6% vs treatment 40.7%, **p ≈ 1.7e-10** (deterministic seed — re-seeds reproduce the same numbers).
-- Anonymous (no session) sees **0 rows** — verified.
+- A/B experiment concluded: control 29.6% vs treatment 40.7%, **p ≈ 1.7e-10**. The nominal design is a +20% relative lift over a 30% base — a 36% treatment threshold — but the realized draw under the fixed `rng(7)` stream is ≈40.7% (re-seeds reproduce the same numbers). The effect is therefore a property of the fixed stream, not a designed 6 pp lift.
+- Anonymous (no session) sees **0 rows** — enforced by RLS on every table and asserted statically in `tests/` (no DB required).
 - Demo dataset seeded: 8k users, ~82k events, 1 A/B experiment, demo user.
+
+**Limitations.** The A/B events are seeded, so the headline effect is synthetic — no product history stands behind the numbers. The value is not the magnitude of the effect but that the experiment is computed in the database, isolated per tenant, and reproducible by any client. Numbers match the site case exactly: control 29.6% / treatment 40.7% / p ≈ 1.7e-10.
 
 A full-stack product analytics platform: a Streamlit dashboard that reads live
 data from **Supabase Postgres** through **Row Level Security**, plus an
@@ -155,7 +157,7 @@ Returns `202` on success, `401` on a bad key, `400` on an invalid body.
 ├── supabase_client.py       # RLS-scoped query layer (paginated) + ingest client
 ├── data.py                  # SQL-backed data layer, API-compatible with streamlit-app
 ├── pages/                   # overview, funnel, retention, revenue, segments, experiments, events
-├── sql/                     # migrations 001–005
+├── sql/                     # migrations 001–008
 ├── supabase/functions/ingest/  # Edge Function (Deno)
 └── scripts/seed_events.py   # deterministic synthetic dataset + A/B experiment
 ```

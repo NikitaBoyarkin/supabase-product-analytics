@@ -170,10 +170,15 @@ def chunked(rows: list[dict], size: int = BATCH):
 
 
 def seed_experiment(client, ext_to_id: dict[str, int], events: pd.DataFrame) -> None:
-    """One concluded A/B test: pricing page redesign, +20% relative lift.
+    """One concluded A/B test: pricing page redesign.
 
-    Effect size is chosen so the result is statistically significant at the
-    seeded sample size (n≈1500 per variant): 30% → 36% conversion.
+    The nominal design is a +20% relative lift over a 30% base — a 36%
+    treatment conversion threshold. But conversion is drawn from a fixed
+    ``np.random.default_rng(7)`` stream over assignments fetched in
+    ``order("id")``, and the realized draw under that stream is ≈40.7%
+    (616/1513) versus 29.6% (447/1512) for control. The published numbers are
+    therefore reproduced by the fixed stream, not engineered to a 6 pp lift:
+    the effect is a property of the stream, not of a designed effect.
     """
     trial_uids = sorted(
         set(events.loc[events["event_name"] == "start_trial", "user_id"])

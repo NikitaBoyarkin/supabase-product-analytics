@@ -1,0 +1,37 @@
+name: CI
+
+# Member-level CI only: lint + static tests for this member.
+#
+# The portfolio-level gate (`bash scripts/preflight.sh` — registry + claims)
+# lives in the portfolio root, NOT in this member, and is out of scope here.
+# This workflow must stay green on a clean checkout: the tests read the SQL
+# migrations as text, so they need no database, no Supabase credentials and no
+# machine-local data.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-test:
+    name: lint + test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Test (pytest)
+        run: uv run pytest -q

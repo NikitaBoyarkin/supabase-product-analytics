@@ -5,7 +5,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import pandas as pd
 import plotly.express as px
 import streamlit as st
 
@@ -38,9 +37,7 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric("Current MRR", f"${current_mrr:,.0f}")
 c2.metric("Paid users (ever)", f"{paid:,}")
 c3.metric("ARPU (per total user)", f"${arpu_val:,.2f}")
-c4.metric(
-    "Logo churn (period)", f"{logo_churn:.1%}", delta="-" if logo_churn > 0 else "0"
-)
+c4.metric("Logo churn (period)", f"{logo_churn:.1%}", delta="-" if logo_churn > 0 else "0")
 
 st.divider()
 
