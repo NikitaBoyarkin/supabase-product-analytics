@@ -7,6 +7,8 @@
 - 🏦 [Flagship case: Volta neobank](https://github.com/NikitaBoyarkin/volta-banking)
 - 🧪 Related: [supabase-product-analytics](https://github.com/NikitaBoyarkin/supabase-product-analytics) · [streamlit-app](https://github.com/NikitaBoyarkin/streamlit-app) · [airflow](https://github.com/NikitaBoyarkin/airflow)
 
+**▶ [Diagram: Supabase product analytics · ingest behind RLS](docs/diagrams/supabase-product-analytics.html)** — opens in a browser, no install, no build
+
 **On this page:** [Situation](#situation) · [Task](#task) · [Actions](#actions) · [Result](#result) · [Architecture](#architecture) · [Security model](#security-model-rls) · [Schema](#schema-migrations) · [Setup](#setup) · [Ingest API](#ingest-api) · [What to show in a portfolio](#what-to-show-in-a-portfolio) · [Repo layout](#repo-layout)
 
 ## Situation
