@@ -440,7 +440,7 @@ Critical Path: 001_schema → 004_rls/ingest → seed → 002_views → dashboar
 - **Влияние:** Medium (портфолио-витрина vs локальная демо)
 
 #### Q2: Публичность репо
-- **Статус:** приватный `github.com/NikitaBoyarkin/supabase-product-analytics`
+- **Статус:** публичный `github.com/NikitaBoyarkin/supabase-product-analytics` (открыт 2026-10-25). Причина: Community Cloud даёт только один приватный app, слот занят. Перед публикацией проверена вся история — `.env`/`secrets.toml` не коммитились, JWT и service_role значений нет.
 - **Варианты:** (A) оставить приватным + ссылка по запросу; (B) сделать публичным после вычистки секретов
 - **Влияние:** Medium
 
