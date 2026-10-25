@@ -1,6 +1,10 @@
 # Product Analytics + A/B Experiments (Supabase)
 
-> A/B experiment concluded at control 29.6% vs treatment 40.7% (p ≈ 1.7e-10) — an in-database experiment that any client, a Streamlit dashboard or plain SQL, reads back identically, on a full-stack Supabase Postgres platform: Edge Function ingest behind Row Level Security.
+> A/B-эксперимент закрыт: контроль 29,6 %, тест 40,7 %, p ≈ 1.7e-10.
+> Эксперимент живёт в базе — любой клиент, Streamlit-дашборд или
+> обычный SQL, читает одни и те же числа. Платформа целиком на
+> Supabase Postgres: события принимает Edge Function, доступ режет
+> Row Level Security.
 
 ## Navigation
 - 🌐 [Portfolio site](https://nikitaboyarkin.github.io)
@@ -13,37 +17,55 @@
 
 ## Situation
 
-A standalone `streamlit-app` dashboard already existed, but its data layer was an in-memory generator — nothing persisted, nothing was access-controlled, and there was no real ingest path or experiment history.
+Дашборд `streamlit-app` уже был, но данные жили в памяти генератора.
+Ничего не сохранялось, доступа по организациям не было, приёма
+событий и истории экспериментов тоже.
 
 ## Task
 
-Turn it into a full-stack product analytics platform: live **Supabase Postgres** read through **Row Level Security**, an **Edge Function** ingest API that accepts events by API key, and a concluded **A/B experiment** with SQL-computed conversion.
+Собрать из этого полноценную платформу продуктовой аналитики: живой
+Supabase Postgres, чтение через Row Level Security, Edge Function
+принимает события по API-ключу, A/B-эксперимент считается в SQL.
 
 ## Actions
 
-- Designed two schemas: `analytics` (organizations, api_keys, users, events, subscriptions, org_members) and `experiments` (experiments, variants, assignments, metrics).
-- Pushed analytics into the DB: SQL views compute funnel, cohort retention, MRR, DAU, and channel conversion (`sql/002_views.sql`); `experiments.v_results` computes per-variant assigned/converted/conversion.
-- Enabled RLS on every table with an `analytics.my_orgs()` helper, so a user sees only their own org's rows.
-- Built the ingest Edge Function (`supabase/functions/ingest`, Deno): validates an API key stored as a SHA-256 hash and inserts the event via a `security definer` function.
-- Reused the dashboard UI from `streamlit-app` — swapped only the data layer, from an in-memory generator to RLS-scoped Postgres queries.
-- Ran the A/B significance test (χ²) on top of `v_results`.
+- Две схемы: `analytics` (organizations, api_keys, users, events,
+  subscriptions, org_members) и `experiments` (experiments, variants,
+  assignments, metrics);
+- аналитика уехала в базу: SQL-вью считают воронку, retention по
+  когортам, MRR, DAU и конверсию по каналам (`sql/002_views.sql`), а
+  `experiments.v_results` считает назначенных, конвертированных и
+  конверсию по вариантам;
+- RLS включён на каждой таблице, рядом хелпер `analytics.my_orgs()` —
+  пользователь видит только строки своей организации;
+- Edge Function `supabase/functions/ingest` (Deno) проверяет API-ключ,
+  хранит его как SHA-256-хеш и вставляет событие через функцию
+  `security definer`;
+- интерфейс дашборда переехал из `streamlit-app` без переделки —
+  поменялся только слой данных: вместо генератора в памяти теперь
+  запросы к Postgres через RLS;
+- поверх `v_results` прогнан χ²-тест значимости.
 
 ## Result
 
-- A/B experiment concluded: control 29.6% vs treatment 40.7%, **p ≈ 1.7e-10**. The nominal design is a +20% relative lift over a 30% base — a 36% treatment threshold — but the realized draw under the fixed `rng(7)` stream is ≈40.7% (re-seeds reproduce the same numbers). The effect is therefore a property of the fixed stream, not a designed 6 pp lift.
-- Anonymous (no session) sees **0 rows** — enforced by RLS on every table and asserted statically in `tests/` (no DB required).
-- Demo dataset seeded: 8k users, ~82k events, 1 A/B experiment, demo user.
+- A/B-эксперимент закрыт: контроль 29,6 %, тест 40,7 %,
+  **p ≈ 1.7e-10**. В дизайне был рост на 20 % относительно базы 30 %,
+  то есть порог 36 % для теста. Фактический прогон на фиксированном
+  потоке `rng(7)` дал ≈40,7 % — пересев воспроизводит те же числа.
+  Значит, эффект принадлежит фиксированному потоку, а не
+  спроектированному росту на 6 п. п.;
+- аноним без сессии видит **0 строк** — это держит RLS на каждой
+  таблице, проверка статична и лежит в `tests/`, база для неё не
+  нужна;
+- демо-данные: 8k пользователей, ~82k событий, 1 A/B-эксперимент,
+  демо-пользователь.
 
-**Limitations.** The A/B events are seeded, so the headline effect is synthetic — no product history stands behind the numbers. The value is not the magnitude of the effect but that the experiment is computed in the database, isolated per tenant, and reproducible by any client. Numbers match the site case exactly: control 29.6% / treatment 40.7% / p ≈ 1.7e-10.
-
-A full-stack product analytics platform: a Streamlit dashboard that reads live
-data from **Supabase Postgres** through **Row Level Security**, plus an
-**Edge Function** ingest API that accepts events by API key. Includes a
-concluded **A/B experiment** with SQL-computed conversion and a χ²
-significance test.
-
-The dashboard UI is reused from a standalone `streamlit-app` — only the data
-layer changed, from an in-memory generator to RLS-scoped Postgres queries.
+**Limitations.** События для A/B сгенерированы, поэтому заметный
+эффект синтетический — истории продукта за числами нет. Ценность не
+в размере эффекта, а в том, что эксперимент считается в базе,
+изолирован по тенантам и воспроизводится любым клиентом. Числа
+совпадают с кейсом на сайте: контроль 29,6 %, тест 40,7 %,
+p ≈ 1.7e-10.
 
 ## Architecture
 
@@ -60,21 +82,22 @@ layer changed, from an in-memory generator to RLS-scoped Postgres queries.
 ```
 
 - **Schemas**: `analytics` (organizations, api_keys, users, events,
-  subscriptions, org_members) and `experiments` (experiments, variants,
+  subscriptions, org_members) и `experiments` (experiments, variants,
   assignments, metrics).
-- **Analytics in the DB**: SQL views compute funnel, cohort retention, MRR,
-  DAU, and channel conversion (`sql/002_views.sql`) — the dashboard reshapes,
-  it doesn't aggregate.
-- **A/B result in the DB**: `experiments.v_results` computes per-variant
-  assigned/converted/conversion; the dashboard runs the χ² test on top.
-- **Ingest**: `supabase/functions/ingest` validates an API key (stored as a
-  SHA-256 hash, never plaintext) and inserts the event via a
-  `security definer` function.
+- **Analytics in the DB**: вью считают воронку, retention по когортам,
+  MRR, DAU и конверсию по каналам (`sql/002_views.sql`). Дашборд
+  только перекладывает результат, сам не агрегирует.
+- **A/B result in the DB**: `experiments.v_results` считает
+  назначенных, конвертированных и конверсию по вариантам, χ²-тест
+  дашборд запускает поверх.
+- **Ingest**: `supabase/functions/ingest` сверяет API-ключ (хранится
+  как SHA-256-хеш, в открытом виде — никогда) и вставляет событие
+  через функцию `security definer`.
 
 ## Security model (RLS)
 
-Every table has Row Level Security enabled. A user only ever sees rows of
-their own organization:
+Row Level Security включён на каждой таблице. Пользователь видит
+только строки своей организации:
 
 ```sql
 -- analytics.my_orgs() resolves the caller's orgs from auth.uid()
@@ -82,29 +105,31 @@ create policy "org scoped select" on analytics.events
   for select using (organization_id in (select analytics.my_orgs()));
 ```
 
-- **Anonymous** (no session): sees **0 rows** — verified.
-- **Authenticated demo user**: sees only their org's rows.
-- **Ingest**: the Edge Function calls `analytics.ingest_event(...)`, a
-  `security definer` function that checks the API-key hash and inserts the
-  event — no direct table access from the client.
-- **Service role** (admin, seed only): full access via `005_service_role_grants`.
+- **Anonymous** (no session): видит **0 строк** — проверено.
+- **Authenticated demo user**: видит только строки своей организации.
+- **Ingest**: Edge Function зовёт `analytics.ingest_event(...)` —
+  функцию `security definer`, которая сверяет хеш ключа и вставляет
+  событие. До таблиц клиент не достаёт.
+- **Service role** (admin, только для засева): полный доступ через
+  `005_service_role_grants`.
 
 ## Schema (migrations)
 
 | Migration | Contents |
 |---|---|
-| `001_schema.sql` | `analytics` tables: organizations, api_keys (key_hash), users, events, subscriptions, org_members |
+| `001_schema.sql` | таблицы `analytics`: organizations, api_keys (key_hash), users, events, subscriptions, org_members |
 | `002_views.sql` | `v_events`, `v_subscriptions`, `v_funnel`, `v_retention_raw`, `v_cohort_sizes`, `v_mrr`, `v_conversion_channel`, `v_dau` |
-| `003_experiments.sql` | `experiments` tables + `v_results` (SQL-computed conversion) |
-| `004_rls.sql` | RLS policies, `my_orgs()` helper, `ingest_event()` security definer |
-| `005_service_role_grants.sql` | Grants for the seed script (service role) |
-| `006_expose_schemas.sql` | Expose `analytics` + `experiments` to PostgREST (`pgrst.db_schemas`) |
-| `007_expose_schemas_clean.sql` | Same, comma-separated without spaces (PostgREST parse safety) |
-| `008_authenticator_grants.sql` | `USAGE` on custom schemas for the `authenticator` role |
+| `003_experiments.sql` | таблицы `experiments` + `v_results` (конверсия считается в SQL) |
+| `004_rls.sql` | политики RLS, хелпер `my_orgs()`, `ingest_event()` как `security definer` |
+| `005_service_role_grants.sql` | гранты для скрипта засева (service role) |
+| `006_expose_schemas.sql` | открывает `analytics` и `experiments` для PostgREST (`pgrst.db_schemas`) |
+| `007_expose_schemas_clean.sql` | то же, но списком через запятую без пробелов — PostgREST парсит надёжнее |
+| `008_authenticator_grants.sql` | `USAGE` на кастомные схемы для роли `authenticator` |
 
-Schemas are also declared in `supabase/config.toml` → `[api].schemas` (managed via
-`supabase config push`); migrations are symlinked into `supabase/migrations/` so
-`supabase db push` applies them in order on a fresh project.
+Схемы объявлены и в `supabase/config.toml` → `[api].schemas`
+(правится через `supabase config push`). Миграции слинкованы в
+`supabase/migrations/`, поэтому `supabase db push` применяет их по
+порядку на новом проекте.
 
 ## Setup
 
@@ -122,7 +147,8 @@ uv run python scripts/seed_events.py
 uv run streamlit run app.py
 ```
 
-Demo login (created by the seed): `demo@acme-saas.dev` / `demo-password-123`.
+Логин демо-пользователя из засева: `demo@acme-saas.dev` /
+`demo-password-123`.
 
 ## Ingest API
 
@@ -133,24 +159,26 @@ curl -X POST "https://feqhphmtldgjocjrydek.supabase.co/functions/v1/ingest" \
   -d '{"user_id":"u00001","event_name":"signup","properties":{"channel":"organic"}}'
 ```
 
-Returns `202` on success, `401` on a bad key, `400` on an invalid body.
+Успех отвечает `202`, плохой ключ — `401`, битое тело — `400`.
 
 ## What to show in a portfolio
 
-1. **Full-stack signal**: Postgres schema design, RLS, Edge Functions, Auth —
-   not just pandas.
-2. **Analytics in the DB**: funnel/retention/MRR as SQL views, not Python.
-3. **A/B experiment end-to-end**: assignments → metrics → `v_results` →
-   χ² significance (control 29.6% vs treatment 40.7%, **p ≈ 1.7e-10**).
-   Deterministic seed: assignment fetch is ordered by id so re-seeds reproduce
-   the same numbers.
-4. **Security**: API keys stored as hashes, RLS verified (anon sees 0 rows),
-   `security definer` ingest.
-5. **Reuse**: the dashboard UI was reused from an existing Streamlit app —
-   only the data layer changed.
-6. **Phase 4 extras**: funnel breakdown by segment/channel/country/device,
-   CSV export on every table, and an Events page that sends custom events
-   through the same ingest API (needs `INGEST_API_KEY`).
+1. **Full-stack signal**: проектирование схем Postgres, RLS, Edge
+   Functions, Auth — не только pandas.
+1. **Analytics in the DB**: воронка, retention и MRR живут во вью SQL, а
+   не в Python.
+1. **A/B experiment end-to-end**: назначения → метрики → `v_results` →
+   χ²-тест (контроль 29,6 %, тест 40,7 %, **p ≈ 1.7e-10**). Засев
+   детерминированный: назначения читаются по порядку id, поэтому
+   пересев даёт те же числа.
+1. **Security**: API-ключи лежат хешами, RLS проверен (аноним видит
+   0 строк), приём идёт через `security definer`.
+1. **Reuse**: интерфейс дашборда взят из готового Streamlit-приложения,
+   поменялся только слой данных.
+1. **Phase 4 extras**: разбивка воронки по сегменту, каналу, стране и
+   устройству, выгрузка любой таблицы в CSV и страница Events —
+   отправляет свои события через тот же Ingest API (нужен
+   `INGEST_API_KEY`).
 
 ## Repo layout
 
