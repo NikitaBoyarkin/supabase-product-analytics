@@ -434,7 +434,7 @@ Critical Path: 001_schema → 004_rls/ingest → seed → 002_views → dashboar
 
 ### Open Questions
 #### Q1: Деплой на Streamlit Cloud
-- **Статус:** проект пересоздан (`feqhphmtldgjocjrydek`, 2026-09-15): миграции 001–008 применены, seed залит, ingest задеплоен и протестирован live. Осталось: переключить/пересоздать app на Cloud с новыми секретами (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `INGEST_API_KEY`)
+- **Статус:** проект пересоздан (`rxeebvgrnjgzrftpwwlm`, 2026-10-25, eu-central-1): миграции 001–008 применены, seed залит (8000 users / 82301 events), ingest задеплоен, живой RLS-тест `tests/test_rls_live.py` — 11 passed. Осталось: создать app на Cloud с новыми секретами (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `INGEST_API_KEY`)
 - **Варианты:** (A) переключить app на main → проверить логин; (B) пересоздать app; (C) не деплоить (локальная демо)
 - **Владелец:** Nikita
 - **Влияние:** Medium (портфолио-витрина vs локальная демо)
