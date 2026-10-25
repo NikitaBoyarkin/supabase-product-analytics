@@ -1,0 +1,8 @@
+# Runtime deps for Streamlit Community Cloud (pip-based).
+# Source of truth: [project].dependencies in pyproject.toml.
+streamlit>=1.36
+pandas>=2.0
+numpy>=1.24
+plotly>=5.20
+supabase>=2.4
+scipy>=1.10
