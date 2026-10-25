@@ -1,0 +1,13 @@
+[server]
+port = 8501
+address = "0.0.0.0"
+runOnSave = true
+maxUploadSize = 50
+
+[theme]
+base = "dark"
+primaryColor = "#4DA8DA"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1A1F2B"
+textColor = "#FAFAFA"
+font = "sans serif"

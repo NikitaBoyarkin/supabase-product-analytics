@@ -32,10 +32,14 @@ Supabase Postgres, чтение через Row Level Security, Edge Function
 - Две схемы: `analytics` (organizations, api_keys, users, events,
   subscriptions, org_members) и `experiments` (experiments, variants,
   assignments, metrics);
-- аналитика уехала в базу: SQL-вью считают воронку, retention по
-  когортам, MRR, DAU и конверсию по каналам (`sql/002_views.sql`), а
-  `experiments.v_results` считает назначенных, конвертированных и
-  конверсию по вариантам;
+- SQL-слой в базе: вью `analytics.v_funnel`, `v_retention_raw`,
+  `v_cohort_sizes`, `v_mrr`, `v_conversion_channel`, `v_dau`
+  (`sql/002_views.sql`) считают воронку, retention по когортам, MRR, DAU
+  и конверсию по каналам, а `experiments.v_results` — назначенных,
+  конвертированных и конверсию по вариантам;
+- дашборд читает `v_events` и `v_subscriptions` через RLS и пересчитывает
+  агрегаты в pandas (`data.py:127`+): вью — SQL-путь для сверки, не
+  источник цифр на экране;
 - RLS включён на каждой таблице, рядом хелпер `analytics.my_orgs()` —
   пользователь видит только строки своей организации;
 - Edge Function `supabase/functions/ingest` (Deno) проверяет API-ключ,
@@ -153,7 +157,7 @@ uv run streamlit run app.py
 ## Ingest API
 
 ```bash
-curl -X POST "https://feqhphmtldgjocjrydek.supabase.co/functions/v1/ingest" \
+curl -X POST "https://rxeebvgrnjgzrftpwwlm.supabase.co/functions/v1/ingest" \
   -H "x-api-key: sb_analytics_<your_key>" \
   -H "Content-Type: application/json" \
   -d '{"user_id":"u00001","event_name":"signup","properties":{"channel":"organic"}}'
