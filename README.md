@@ -12,11 +12,13 @@ _>|_||_)(_||_)(_|_>(/_ |_)|(_)(_||_|(_ |_ (_|| |(_||\/|_|(__>
 
 # Product Analytics + A/B Experiments (Supabase)
 
-> A/B-эксперимент закрыт: контроль 29,6 %, тест 40,7 %, p ≈ 1.7e-10.
+> A/B-эксперимент закрыт на синтетическом потоке событий: контроль 29,6 %, тест 40,7 %, p ≈ 1.7e-10.
 > Эксперимент живёт в базе — любой клиент, Streamlit-дашборд или
 > обычный SQL, читает одни и те же числа. Платформа целиком на
 > Supabase Postgres: события принимает Edge Function, доступ режет
 > Row Level Security.
+
+**Public link:** [демо](https://nikitaboyarkin.github.io/demos/supabase/index.html) · [кейс](https://nikitaboyarkin.github.io/projects/supabase/) · [исходники](https://github.com/NikitaBoyarkin/supabase-product-analytics)
 
 ## Navigation
 - 🌐 [Portfolio site](https://nikitaboyarkin.github.io)
@@ -150,6 +152,10 @@ create policy "org scoped select" on analytics.events
 ## Setup
 
 ```bash
+# 0. Create the Supabase project, then link and push the migrations
+supabase link --project-ref <project-ref>
+supabase db push   # applies supabase/migrations/ in order: 001_schema … 008_authenticator_grants
+
 # 1. Install deps
 uv sync
 
@@ -169,11 +175,15 @@ uv run streamlit run app.py
 ## Ingest API
 
 ```bash
-curl -X POST "https://rxeebvgrnjgzrftpwwlm.supabase.co/functions/v1/ingest" \
+curl -X POST "https://<project-ref>.supabase.co/functions/v1/ingest" \
   -H "x-api-key: sb_analytics_<your_key>" \
   -H "Content-Type: application/json" \
   -d '{"user_id":"u00001","event_name":"signup","properties":{"channel":"organic"}}'
 ```
+
+Хост в примере — плейсхолдер: размещённый демо-проект, на который
+указывал этот URL, больше не существует, поэтому перед запуском curl
+эндпоинт нужно поднять заново из `sql/` и `supabase/` (шаги Setup выше).
 
 Успех отвечает `202`, плохой ключ — `401`, битое тело — `400`.
 
